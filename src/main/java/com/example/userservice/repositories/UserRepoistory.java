@@ -1,0 +1,11 @@
+package com.example.userservice.repositories;
+
+import com.example.userservice.models.User;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.Optional;
+
+public interface UserRepoistory extends JpaRepository<User, Long> {
+    Optional<User> findById(Long id);
+    Optional<User> findByEmail(String email);
+}
