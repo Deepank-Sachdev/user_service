@@ -2,6 +2,7 @@ package com.example.userservice.controllers;
 
 import com.example.userservice.dtos.*;
 import com.example.userservice.dtos.ResponseStatus;
+import com.example.userservice.exceptions.InvalidCredentialsException;
 import com.example.userservice.exceptions.TokenNotFoundException;
 import com.example.userservice.exceptions.UserNotFoundException;
 import com.example.userservice.models.Token;
@@ -46,7 +47,7 @@ public class UserController {
                 responseDto.setLoggedIn(true);
                 responseDto.setResponseStatus(ResponseStatus.SUCCESS);
 
-        } catch (UserNotFoundException e) {
+        } catch (InvalidCredentialsException e) {
             responseDto.setResponseStatus(ResponseStatus.FAILURE);
         }
         return responseDto;

@@ -1,15 +1,21 @@
 package com.example.userservice.services;
 
+import com.example.userservice.exceptions.InvalidCredentialsException;
 import com.example.userservice.exceptions.TokenNotFoundException;
 import com.example.userservice.exceptions.UserNotFoundException;
 import com.example.userservice.models.Token;
 import com.example.userservice.models.User;
 import com.example.userservice.repositories.TokenRepository;
 import com.example.userservice.repositories.UserRepoistory;
-import org.apache.commons.lang3.RandomStringUtils;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.*;
+import io.jsonwebtoken.security.Keys;
+import io.jsonwebtoken.security.SignatureException;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.security.Key;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.Optional;
@@ -20,6 +26,10 @@ public class UserService {
     private UserRepoistory userRepository;
     private TokenRepository tokenRepository;
     private BCryptPasswordEncoder bCryptPasswordEncoder;
+    @Value("${jwt.secret}")
+    private String jwtSecret;
+    @Value("${jwt.expiration}")
+    private long jwtExpiration;
 
     public UserService(UserRepoistory userRepository,
                           TokenRepository tokenRepository,
@@ -29,17 +39,17 @@ public class UserService {
         this.tokenRepository = tokenRepository;
     }
 
-    public Token login(String email, String password) throws UserNotFoundException{
+    public Token login(String email, String password) throws InvalidCredentialsException{
         Optional<User> userOptional = userRepository.findByEmail(email);
         if (userOptional.isEmpty()){
-            throw new UserNotFoundException("User doesn't exists. Please Signup");
+            throw new InvalidCredentialsException("Invalid Credentials, Please try again!");
         }
         if (bCryptPasswordEncoder.matches(password, userOptional.get().getHashedPassword())) {
-            Token token = generateToken(userOptional.get());
-            return tokenRepository.save(token);
+            Token jwtToken = generateToken(userOptional.get());
+            return tokenRepository.save(jwtToken);
         }
         else {
-            throw new UserNotFoundException("Invalid password");
+            throw new InvalidCredentialsException("Invalid Credentials, Please try again!");
         }
     }
 
@@ -58,14 +68,41 @@ public class UserService {
     }
 
     public User validateToken(String token) throws TokenNotFoundException {
-        Optional<Token> tokenOptional = tokenRepository.findByTokenAndDeletedAndExpiryGreaterThan(token,
-                                                false, new Date());
+        try {
+            String email = Jwts.parser()
+                        .setSigningKey(Keys.hmacShaKeyFor(jwtSecret.getBytes()))
+                        .build()
+                        .parseClaimsJws(token)
+                        .getBody()
+                        .getSubject();
+//            String email = Jwts.parser().verifyWith(Keys.hmacShaKeyFor(jwtSecret.getBytes())).build().parseClaimsJws(token).getBody().getSubject();
+            Optional<Token> tokenOptional = tokenRepository.findByTokenAndDeletedAndExpiryGreaterThan(token,
+                    false, new Date());
 
-        if (tokenOptional.isEmpty()){
-            throw  new TokenNotFoundException("Unable to login. Please try again");
+            if (tokenOptional.isEmpty()) {
+                throw new TokenNotFoundException("Unable to login. Please try again");
+            }
+            return tokenOptional.get().getUser();
+
+        } catch (ExpiredJwtException e) {
+            // Handle expired JWT
+            throw new TokenNotFoundException("JWT token has expired.");
+        } catch (SignatureException e) {
+            // Handle invalid JWT signature
+            throw new TokenNotFoundException("Invalid JWT signature.");
+        } catch (MalformedJwtException e) {
+            // Handle malformed JWT
+            throw new TokenNotFoundException("Malformed JWT.");
+        } catch (UnsupportedJwtException e) {
+            // Handle unsupported JWT
+            throw new TokenNotFoundException("Unsupported JWT.");
+        } catch (IllegalArgumentException e) {
+            // Handle empty or null token
+            throw new TokenNotFoundException("Invalid JWT token.");
+        } catch (Exception e) {
+            // Catch any other unexpected exceptions
+            throw new TokenNotFoundException("Invalid token.");
         }
-
-        return tokenOptional.get().getUser();
     }
 
     public void logout(String tokenValue) throws TokenNotFoundException {
@@ -83,14 +120,18 @@ public class UserService {
     private Token generateToken(User user) {
         Token token = new Token();
         token.setUser(user);
-        token.setToken(RandomStringUtils.randomAlphanumeric(128));
-
-            Calendar calendar = Calendar.getInstance();
-            calendar.add(Calendar.DAY_OF_YEAR, 30);
-            Date date = calendar.getTime();
-
-        token.setExpiry(date);
+        token.setToken(generateJwtToken(user));
+        token.setExpiry(new Date(System.currentTimeMillis() + jwtExpiration));
 
         return token;
+    }
+    private String generateJwtToken(User user) {
+        Key key = Keys.hmacShaKeyFor(jwtSecret.getBytes());
+        return Jwts.builder()
+                .subject(user.getEmail())
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + jwtExpiration))
+                .signWith(key)
+                .compact();
     }
 }
