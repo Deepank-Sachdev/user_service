@@ -5,7 +5,7 @@ import com.example.userservice.exceptions.UserNotFoundException;
 import com.example.userservice.models.Token;
 import com.example.userservice.models.User;
 import com.example.userservice.repositories.TokenRepository;
-import com.example.userservice.repositories.UserRepoistory;
+import com.example.userservice.repositories.UserRepository;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -17,13 +17,13 @@ import java.util.Optional;
 @Service
 public class UserService {
 
-    private UserRepoistory userRepository;
+    private UserRepository userRepository;
     private TokenRepository tokenRepository;
     private BCryptPasswordEncoder bCryptPasswordEncoder;
 
-    public UserService(UserRepoistory userRepository,
-                          TokenRepository tokenRepository,
-                        BCryptPasswordEncoder bCryptPasswordEncoder) {
+    public UserService(UserRepository userRepository,
+                       TokenRepository tokenRepository,
+                       BCryptPasswordEncoder bCryptPasswordEncoder) {
         this.userRepository = userRepository;
         this.bCryptPasswordEncoder = bCryptPasswordEncoder;
         this.tokenRepository = tokenRepository;
@@ -43,7 +43,7 @@ public class UserService {
         }
     }
 
-    public User signUp(String name, String email, String password) throws UserNotFoundException {
+    public User signUp(String name, String email, String password, String mobileNo) throws UserNotFoundException {
         Optional<User> userOptional = userRepository.findByEmail(email);
         if (userOptional.isPresent()) {
             throw new UserNotFoundException("User already exists");
@@ -52,6 +52,7 @@ public class UserService {
         User user = new User();
         user.setName(name);
         user.setEmail(email);
+        user.setMobile(mobileNo);
         user.setHashedPassword(bCryptPasswordEncoder.encode(password));
 
         return userRepository.save(user);

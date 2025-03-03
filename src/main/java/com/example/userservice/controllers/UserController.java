@@ -26,7 +26,8 @@ public class UserController {
     public SignupUserResponseDTO signUp(@RequestBody SignUpUserRequestDto requestDto) {
         SignupUserResponseDTO responseDTO = new SignupUserResponseDTO();
         try {
-            User user = userService.signUp(requestDto.getName(), requestDto.getEmail(), requestDto.getPassword());
+            User user = userService.signUp(requestDto.getName(), requestDto.getEmail(),
+                                            requestDto.getPassword(), requestDto.getMobile());
             responseDTO.setName(user.getName());
             responseDTO.setEmail(user.getEmail());
             responseDTO.setRoles(user.getRoles());
